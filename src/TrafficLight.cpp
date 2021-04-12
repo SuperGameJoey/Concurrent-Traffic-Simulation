@@ -1,10 +1,14 @@
 #include <iostream>
 #include <random>
+#include <chrono>
+#include <thread>
+#include <queue>
+#include <future>
 #include "TrafficLight.h"
 
 /* Implementation of class "MessageQueue" */
 
-/* 
+ 
 template <typename T>
 T MessageQueue<T>::receive()
 {
@@ -19,11 +23,11 @@ void MessageQueue<T>::send(T &&msg)
     // FP.4a : The method send should use the mechanisms std::lock_guard<std::mutex> 
     // as well as _condition.notify_one() to add a new message to the queue and afterwards send a notification.
 }
-*/
+
 
 /* Implementation of class "TrafficLight" */
 
-/* 
+
 TrafficLight::TrafficLight()
 {
     _currentPhase = TrafficLightPhase::red;
@@ -44,7 +48,11 @@ TrafficLightPhase TrafficLight::getCurrentPhase()
 void TrafficLight::simulate()
 {
     // FP.2b : Finally, the private method „cycleThroughPhases“ should be started in a thread when the public method „simulate“ is called. To do this, use the thread queue in the base class. 
+
+    // launch cycleThroughPhases function in a thread
+    threads.emplace_back(std::thread(&TrafficLight::cycleThroughPhases, this));
 }
+
 
 // virtual function which is executed in a thread
 void TrafficLight::cycleThroughPhases()
@@ -53,6 +61,36 @@ void TrafficLight::cycleThroughPhases()
     // and toggles the current phase of the traffic light between red and green and sends an update method 
     // to the message queue using move semantics. The cycle duration should be a random value between 4 and 6 seconds. 
     // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles. 
-}
 
-*/
+    // create monitor object as a shared pointer
+    std::shared_ptr<MessageQueue<TrafficLightPhase>> queue(new MessageQueue<TrafficLightPhase>);
+    
+    // store current time as start time
+    auto startTime = std::chrono::system_clock::now();
+    
+    // generate random cycle duration between 4 and 6 seconds
+    std::random_device rd;
+    std::default_random_engine eng(rd());
+    std::uniform_real_distribution<double> distr(4.0, 6.0);
+    double cycleDuration = distr(eng);
+
+    while (true)
+    {
+        auto currentTime = std::chrono::system_clock::now();
+        auto totalSeconds = std::chrono::duration<double>(currentTime - startTime);
+
+        if (totalSeconds.count() >= cycleDuration)
+        {
+            // toggle current phase
+            _currentPhase = _currentPhase == TrafficLightPhase::red ? TrafficLightPhase::green : TrafficLightPhase::red;
+            
+            // update start time for next cycle
+            startTime = std::chrono::system_clock::now();
+
+            // send a message to the queue
+            std::async(std::launch::async, &MessageQueue<TrafficLightPhase>::send, queue, std::move(_currentPhase));
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}

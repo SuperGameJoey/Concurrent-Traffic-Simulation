@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "deque": "cpp",
+        "future": "cpp",
+        "thread": "cpp",
+        "condition_variable": "cpp"
+    }
+}
